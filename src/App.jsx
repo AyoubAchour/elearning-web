@@ -14,6 +14,8 @@ import CourseContentPage from './pages/CourseContentPage';
 import EnrollmentSuccessPage from './pages/EnrollmentSuccessPage';
 import MyCoursesPage from './pages/MyCoursesPage';
 import PrivateRoute from './components/common/PrivateRoute';
+import QuizPage from './pages/QuizPage';
+import CertificatePage from './pages/CertificatePage';
 
 function App() {
   return (
@@ -40,6 +42,8 @@ function App() {
             <Route path="payment-success" element={<PaymentSuccessPage />} />
             <Route path="enrollment-success" element={<EnrollmentSuccessPage />} />
             <Route path="courses/:courseId/content" element={<CourseContentPage />} />
+            <Route path="courses/:courseId/quiz" element={<QuizPage />} />
+            <Route path="courses/:courseId/certificate" element={<CertificatePage />} />
           </Route>
           
           {/* Catch-all route */}

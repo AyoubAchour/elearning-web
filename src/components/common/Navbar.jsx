@@ -32,10 +32,17 @@ const Navbar = () => {
       checkAuth();
     };
     
+    // Add event listener for profile updates
+    const handleProfileUpdate = () => {
+      checkAuth();
+    };
+    
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userProfileUpdated', handleProfileUpdate);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userProfileUpdated', handleProfileUpdate);
     };
   }, [location]);
   
@@ -149,6 +156,14 @@ const Navbar = () => {
                       Your Profile
                     </Link>
                     <Link
+                      to="/profile"
+                      state={{ editMode: true }}
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      Edit Profile
+                    </Link>
+                    <Link
                       to="/my-courses"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => setIsProfileMenuOpen(false)}
@@ -252,6 +267,14 @@ const Navbar = () => {
               onClick={() => setIsProfileMenuOpen(false)}
             >
               Your Profile
+            </Link>
+            <Link
+              to="/profile"
+              state={{ editMode: true }}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              onClick={() => setIsProfileMenuOpen(false)}
+            >
+              Edit Profile
             </Link>
             <Link
               to="/my-courses"

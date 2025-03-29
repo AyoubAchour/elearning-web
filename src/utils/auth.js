@@ -115,4 +115,32 @@ export const enrollInCourse = (courseId) => {
   }
   
   return true;
+};
+
+/**
+ * Update user profile information
+ * @param {Object} updatedData - User profile data to update (fullName, email, password)
+ * @returns {boolean} True if update was successful
+ */
+export const updateUserProfile = (updatedData) => {
+  const user = getCurrentUser();
+  
+  if (!user) return false;
+  
+  // Create updated user object
+  const updatedUser = {
+    ...user,
+    ...updatedData,
+    // Add a lastUpdated timestamp
+    lastUpdated: new Date().toISOString()
+  };
+  
+  // Save updated user data
+  if (localStorage.getItem('currentUser')) {
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+  } else {
+    sessionStorage.setItem('currentUser', JSON.stringify(updatedUser));
+  }
+  
+  return true;
 }; 

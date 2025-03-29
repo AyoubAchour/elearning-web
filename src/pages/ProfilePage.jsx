@@ -1,16 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { isAuthenticated, getCurrentUser, getEnrolledCourses } from '../utils/auth';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { isAuthenticated, getCurrentUser, getEnrolledCourses, updateUserProfile } from '../utils/auth';
 import profilePicture from '../assets/images/profile-picture.svg';
 import { coursesData } from '../data/coursesData';
 import { extendedCoursesData } from '../data/extendedCoursesData';
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState(null);
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [courseProgress, setCourseProgress] = useState({});
+  
+  // Edit profile states
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [updateSuccess, setUpdateSuccess] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -22,6 +34,19 @@ const ProfilePage = () => {
     // Get current user data
     const userData = getCurrentUser();
     setUser(userData);
+    
+    // Initialize form data with current user info
+    setFormData({
+      fullName: userData?.fullName || '',
+      email: userData?.email || '',
+      password: '',
+      confirmPassword: '',
+    });
+    
+    // Check if we should enable edit mode from navigation state
+    if (location.state?.editMode) {
+      setIsEditing(true);
+    }
 
     // Get and map enrolled courses
     const userEnrolledCourses = getEnrolledCourses();
@@ -63,7 +88,7 @@ const ProfilePage = () => {
     
     setCourseProgress(progressData);
     setLoading(false);
-  }, [navigate]);
+  }, [navigate, location.state]);
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -73,6 +98,122 @@ const ProfilePage = () => {
       month: 'long', 
       day: 'numeric' 
     });
+  };
+  
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+    
+    // Clear error for this field when user starts typing
+    if (formErrors[name]) {
+      setFormErrors({
+        ...formErrors,
+        [name]: null
+      });
+    }
+    
+    // Clear success message when user edits
+    if (updateSuccess) {
+      setUpdateSuccess(false);
+    }
+  };
+  
+  const validateForm = () => {
+    const errors = {};
+    
+    // Validate fullName
+    if (!formData.fullName.trim()) {
+      errors.fullName = 'Full name is required';
+    }
+    
+    // Validate email
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Email is invalid';
+    }
+    
+    // Only validate password if it's being changed
+    if (formData.password) {
+      // Check password strength
+      if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters';
+      } else if (!/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])/.test(formData.password)) {
+        errors.password = 'Password must include uppercase, lowercase and number';
+      }
+      
+      // Validate password confirmation
+      if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match';
+      }
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
+  const handleEditToggle = () => {
+    if (isEditing) {
+      // Cancel editing - reset form
+      setFormData({
+        fullName: user?.fullName || '',
+        email: user?.email || '',
+        password: '',
+        confirmPassword: '',
+      });
+      setFormErrors({});
+    }
+    
+    setIsEditing(!isEditing);
+    setUpdateSuccess(false);
+  };
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Create update object (don't include empty password)
+    const updateData = {
+      fullName: formData.fullName,
+      email: formData.email,
+    };
+    
+    // Only include password if it was changed
+    if (formData.password) {
+      updateData.password = formData.password;
+    }
+    
+    // Update user profile
+    const success = updateUserProfile(updateData);
+    
+    if (success) {
+      // Get updated user data
+      const updatedUserData = getCurrentUser();
+      setUser(updatedUserData);
+      setUpdateSuccess(true);
+      
+      // Clear password fields
+      setFormData({
+        ...formData,
+        password: '',
+        confirmPassword: '',
+      });
+      
+      // Dispatch event to notify navbar about profile update
+      window.dispatchEvent(new Event('userProfileUpdated'));
+      
+      // Exit edit mode after a delay
+      setTimeout(() => {
+        setIsEditing(false);
+        setUpdateSuccess(false);
+      }, 2000);
+    }
   };
 
   if (loading) {
@@ -100,6 +241,7 @@ const ProfilePage = () => {
             <p className="text-blue-100">{user?.email}</p>
             <p className="text-blue-200 text-sm mt-2">
               Member since {formatDate(user?.createdAt || user?.loginTime)}
+              {user?.lastUpdated && ` • Last updated ${formatDate(user?.lastUpdated)}`}
             </p>
           </div>
 
@@ -107,21 +249,127 @@ const ProfilePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Account Information */}
               <div className="bg-gray-50 p-6 rounded-lg">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Account Information</h2>
-                <div className="space-y-3">
-                  <div>
-                    <p className="text-sm text-gray-500">Full Name</p>
-                    <p className="font-medium">{user?.fullName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium">{user?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">User ID</p>
-                    <p className="font-medium text-gray-700">{user?.id}</p>
-                  </div>
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Account Information</h2>
+                  <button 
+                    onClick={handleEditToggle}
+                    className={`text-sm px-3 py-1 rounded-md ${
+                      isEditing 
+                        ? 'bg-gray-200 text-gray-700' 
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {isEditing ? 'Cancel' : 'Edit Profile'}
+                  </button>
                 </div>
+                
+                {isEditing ? (
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {updateSuccess && (
+                      <div className="bg-green-50 text-green-700 p-3 rounded-md text-sm mb-4">
+                        Your profile has been updated successfully!
+                      </div>
+                    )}
+                    
+                    <div>
+                      <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        id="fullName"
+                        name="fullName"
+                        value={formData.fullName}
+                        onChange={handleInputChange}
+                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                          formErrors.fullName ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.fullName && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.fullName}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                          formErrors.email ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.email && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                        New Password (leave blank to keep current)
+                      </label>
+                      <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                          formErrors.password ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.password && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        className={`w-full p-2 border rounded-md focus:ring-blue-500 focus:border-blue-500 ${
+                          formErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                        }`}
+                      />
+                      {formErrors.confirmPassword && (
+                        <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
+                      )}
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      className="w-full mt-4 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Save Changes
+                    </button>
+                  </form>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm text-gray-500">Full Name</p>
+                      <p className="font-medium">{user?.fullName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Email</p>
+                      <p className="font-medium">{user?.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">User ID</p>
+                      <p className="font-medium text-gray-700">{user?.id}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Subscription Information */}

@@ -11,9 +11,12 @@ const CourseContentPage = () => {
   const [activeLesson, setActiveLesson] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [progress] = useState(30); // Mock progress percentage
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [completedLessons, setCompletedLessons] = useState([]);
+  const [note, setNote] = useState('');
+  const [notes, setNotes] = useState([]);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [isCourseFinished, setIsCourseFinished] = useState(false);
+  const [isQuizDone, setIsQuizDone] = useState(false);
 
   useEffect(() => {
     // Check if user is authenticated and has subscription or is enrolled in this course
@@ -32,6 +35,7 @@ const CourseContentPage = () => {
         return false;
       }
       
+      setIsEnrolled(true);
       return true;
     };
     
@@ -45,6 +49,12 @@ const CourseContentPage = () => {
         const savedProgress = localStorage.getItem(`course_${courseId}_progress`);
         if (savedProgress) {
           setCompletedLessons(JSON.parse(savedProgress));
+        }
+        
+        // Load saved notes
+        const savedNotes = localStorage.getItem(`course_${courseId}_notes`);
+        if (savedNotes) {
+          setNotes(JSON.parse(savedNotes));
         }
       } else {
         // Fallback to mock data if course not found
@@ -77,6 +87,29 @@ const CourseContentPage = () => {
     }
   }, [courseId, navigate]);
 
+  // Check if course is completed whenever completedLessons changes
+  useEffect(() => {
+    if (course) {
+      const totalLessons = course.modules.reduce(
+        (total, module) => total + module.lessons.length, 
+        0
+      );
+      const finished = completedLessons.length === totalLessons;
+      setIsCourseFinished(finished);
+      
+      // Check if quiz is completed
+      const quizResultsStr = localStorage.getItem(`course_${courseId}_quiz_results`);
+      if (quizResultsStr) {
+        try {
+          const quizResults = JSON.parse(quizResultsStr);
+          setIsQuizDone(quizResults.completed === true);
+        } catch {
+          setIsQuizDone(false);
+        }
+      }
+    }
+  }, [courseId, course, completedLessons]);
+
   const handleModuleClick = (index) => {
     setActiveModule(index);
     setActiveLesson(0); // Reset to first lesson when changing modules
@@ -85,7 +118,6 @@ const CourseContentPage = () => {
   const handleLessonClick = (moduleIndex, lessonIndex) => {
     setActiveModule(moduleIndex);
     setActiveLesson(lessonIndex);
-    setIsMobileMenuOpen(false); // Close mobile menu when selecting a lesson
   };
 
   const toggleVideoPlayback = () => {
@@ -116,6 +148,63 @@ const CourseContentPage = () => {
     
     return Math.round((completedLessons.length / totalLessons) * 100);
   };
+  
+  const handleAddNote = () => {
+    if (note.trim()) {
+      const newNote = {
+        id: Date.now(),
+        text: note,
+        lessonId: course?.modules[activeModule]?.lessons[activeLesson]?.id,
+        lessonTitle: course?.modules[activeModule]?.lessons[activeLesson]?.title,
+        timestamp: new Date().toISOString()
+      };
+      
+      const updatedNotes = [...notes, newNote];
+      setNotes(updatedNotes);
+      setNote('');
+      
+      // Save to localStorage
+      localStorage.setItem(`course_${courseId}_notes`, JSON.stringify(updatedNotes));
+    }
+  };
+  
+  const handleDeleteNote = (noteId) => {
+    const updatedNotes = notes.filter(n => n.id !== noteId);
+    setNotes(updatedNotes);
+    localStorage.setItem(`course_${courseId}_notes`, JSON.stringify(updatedNotes));
+  };
+
+  const navigateToNextLesson = () => {
+    const currentModule = course?.modules[activeModule];
+    if (!currentModule) return;
+    
+    // If there are more lessons in the current module
+    if (activeLesson < currentModule.lessons.length - 1) {
+      setActiveLesson(activeLesson + 1);
+    } 
+    // If there are more modules
+    else if (activeModule < course.modules.length - 1) {
+      setActiveModule(activeModule + 1);
+      setActiveLesson(0);
+    }
+  };
+  
+  const navigateToPreviousLesson = () => {
+    // If we're not at the first lesson of the current module
+    if (activeLesson > 0) {
+      setActiveLesson(activeLesson - 1);
+    } 
+    // If we're at the first lesson but not the first module
+    else if (activeModule > 0) {
+      setActiveModule(activeModule - 1);
+      // Go to the last lesson of the previous module
+      setActiveLesson(course.modules[activeModule - 1].lessons.length - 1);
+    }
+  };
+
+  const navigateToQuiz = () => {
+    navigate(`/courses/${courseId}/quiz`);
+  };
 
   if (loading) {
     return (
@@ -127,302 +216,334 @@ const CourseContentPage = () => {
 
   const currentLesson = course?.modules[activeModule]?.lessons[activeLesson];
   const courseProgress = calculateCourseProgress();
+  const currentLessonNotes = notes.filter(n => n.lessonId === currentLesson?.id);
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100 pt-16">
-      {/* Mobile course menu toggle */}
-      <div className="lg:hidden fixed bottom-4 right-4 z-30">
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isMobileMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
-        </button>
+    <div className="min-h-screen bg-white pt-16"> {/* Add pt-16 to prevent navbar overlap */}
+      {/* Header */}
+      <div className="bg-blue-600 p-4">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-white text-2xl font-bold">{course?.title}</h1>
+          <div className="text-blue-100 text-sm mt-1">{course?.modules.length} sections • {course?.duration}</div>
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-grow">
-        {/* Video Section */}
-        <div className="w-full lg:w-2/3 bg-black lg:min-h-screen lg:sticky lg:top-16 lg:h-[calc(100vh-64px)]">
-          {/* Course Progress Bar */}
-          <div className="bg-blue-800 text-white px-4 py-2">
-            <div className="flex justify-between items-center text-sm mb-1">
-              <span>Course Progress</span>
-              <span>{courseProgress}% Complete</span>
-            </div>
-            <div className="w-full bg-blue-900 rounded-full h-2">
-              <div 
-                className="bg-green-500 h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${courseProgress}%` }}
-              ></div>
-            </div>
-          </div>
-          
-          {/* Video Container */}
-          <div className="relative" style={{ paddingBottom: "56.25%" }}>
-            <div className="absolute inset-0 flex flex-col justify-center items-center bg-gray-900">
-              {!isVideoPlaying ? (
-                <div className="text-center">
-                  <h3 className="text-white text-xl font-medium mb-6">{currentLesson?.title}</h3>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Main Content Area */}
+          <div className="w-full md:w-2/3">
+            {/* Video Player Area */}
+            <div className="bg-black relative aspect-video rounded-lg mb-6">
+              <div className="absolute inset-0 flex items-center justify-center">
+                {!isVideoPlaying ? (
                   <button 
                     onClick={toggleVideoPlayback}
-                    className="bg-blue-600 rounded-full p-4 hover:bg-blue-700 transition-colors"
+                    className="bg-white/20 rounded-full p-4 hover:bg-white/30 transition-colors"
                   >
-                    <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                    <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
                     </svg>
                   </button>
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  {/* Video Player Placeholder */}
-                  <div className="relative w-full h-full">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <p className="text-white text-lg">Video is playing: {currentLesson?.title}</p>
-                    </div>
-                    {/* Video Controls Overlay - only show when hovering */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                      <button 
-                        onClick={toggleVideoPlayback}
-                        className="bg-white/20 backdrop-blur-sm rounded-full p-2 text-white"
-                      >
-                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Video Controls */}
-          <div className="bg-gray-900 px-6 py-4">
-            <div className="flex justify-between items-center text-white mb-2">
-              <span className="text-sm md:text-base font-medium">{currentLesson?.title}</span>
-              <span className="text-sm">{currentLesson?.duration}</span>
-            </div>
-            <div className="w-full bg-gray-700 rounded-full h-1.5 mb-4">
-              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${progress}%` }}></div>
-            </div>
-            <div className="flex justify-between">
-              <div className="flex space-x-4">
-                <button className="text-gray-300 hover:text-white focus:outline-none transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M8.445 14.832A1 1 0 0010 14v-2.798l5.445 3.63A1 1 0 0017 14V6a1 1 0 00-1.555-.832L10 8.798V6a1 1 0 00-1.555-.832l-6 4a1 1 0 000 1.664l6 4z"></path>
-                  </svg>
-                </button>
-                <button className="text-gray-300 hover:text-white focus:outline-none transition-colors" onClick={toggleVideoPlayback}>
-                  {isVideoPlaying ? (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
-                    </svg>
-                  )}
-                </button>
-                <button className="text-gray-300 hover:text-white focus:outline-none transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M4.555 5.168A1 1 0 003 6v8a1 1 0 001.555.832L10 11.202V14a1 1 0 001.555.832l6-4a1 1 0 000-1.664l-6-4A1 1 0 0010 6v2.798l-5.445-3.63z"></path>
-                  </svg>
-                </button>
-              </div>
-              <div className="flex space-x-4">
-                <button 
-                  className="text-gray-300 hover:text-white focus:outline-none transition-colors"
-                  onClick={() => toggleLessonCompletion(currentLesson?.id)}
-                >
-                  {completedLessons.includes(currentLesson?.id) ? (
-                    <div className="flex items-center space-x-1 text-green-500">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
-                      </svg>
-                      <span className="text-xs">Completed</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-1">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                      </svg>
-                      <span className="text-xs">Mark as Complete</span>
-                    </div>
-                  )}
-                </button>
-                <button className="text-gray-300 hover:text-white focus:outline-none transition-colors">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Course Contents Sidebar - Desktop */}
-        <div className={`lg:w-1/3 bg-white lg:h-[calc(100vh-64px)] lg:sticky lg:top-16 overflow-y-auto transition-all duration-300 lg:block ${
-          isMobileMenuOpen ? 'fixed inset-0 z-20 pt-16' : 'hidden'
-        }`}>
-          <div className="p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-            <h2 className="text-xl font-bold text-gray-800">Course Contents</h2>
-            <p className="text-sm text-gray-500">
-              {course?.modules.length} sections • {course?.modules.reduce((total, module) => total + module.lessons.length, 0)} lessons
-            </p>
-          </div>
-          
-          <div className="p-2">
-            {course?.modules.map((module, moduleIndex) => (
-              <div key={module.id} className="mb-4">
-                <button
-                  className={`flex items-center justify-between w-full p-3 rounded-lg text-left ${
-                    activeModule === moduleIndex 
-                      ? 'bg-blue-50 text-blue-700 font-medium' 
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`}
-                  onClick={() => handleModuleClick(moduleIndex)}
-                >
-                  <div className="flex items-center">
-                    <div className={`w-7 h-7 flex items-center justify-center rounded-full mr-3 ${
-                      activeModule === moduleIndex ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {moduleIndex + 1}
-                    </div>
-                    <span className={activeModule === moduleIndex ? 'font-medium' : ''}>{module.title}</span>
-                  </div>
-                  <div className="flex items-center">
-                    {/* Module Progress Indicator */}
-                    <div className="mr-3 text-xs text-gray-500">
-                      {module.lessons.filter(lesson => 
-                        completedLessons.includes(lesson.id)
-                      ).length}/{module.lessons.length}
-                    </div>
-                    <svg
-                      className={`w-5 h-5 transform transition-transform ${
-                        activeModule === moduleIndex ? 'rotate-180' : ''
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clipRule="evenodd"
-                      ></path>
-                    </svg>
-                  </div>
-                </button>
-                
-                {/* Lesson list */}
-                {activeModule === moduleIndex && (
-                  <div className="pl-12 pr-3 space-y-1 mt-1">
-                    {module.lessons.map((lesson, lessonIndex) => (
-                      <button
-                        key={lesson.id}
-                        className={`flex items-center w-full p-3 rounded-lg text-left group ${
-                          activeModule === moduleIndex && activeLesson === lessonIndex
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'hover:bg-gray-50 text-gray-700'
-                        }`}
-                        onClick={() => handleLessonClick(moduleIndex, lessonIndex)}
-                      >
-                        <div className="mr-3 flex-shrink-0">
-                          {completedLessons.includes(lesson.id) ? (
-                            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                ></path>
-                              </svg>
-                            </div>
-                          ) : (
-                            <div className="w-6 h-6 rounded-full border-2 border-gray-300 group-hover:border-blue-500"></div>
-                          )}
-                        </div>
-                        <div className="flex-grow">
-                          <p className={`text-sm ${
-                            activeModule === moduleIndex && activeLesson === lessonIndex 
-                              ? 'font-medium' 
-                              : ''
-                          }`}>
-                            {lesson.title}
-                          </p>
-                          <div className="flex items-center text-xs text-gray-500 mt-1">
-                            {lesson.type === 'video' ? (
-                              <>
-                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                                    clipRule="evenodd"
-                                  ></path>
-                                </svg>
-                                <span>{lesson.duration} video</span>
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                                    clipRule="evenodd"
-                                  ></path>
-                                </svg>
-                                <span>{lesson.duration} reading</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        {/* Current Lesson Indicator */}
-                        {activeModule === moduleIndex && activeLesson === lessonIndex && (
-                          <div className="ml-2 w-2 h-2 bg-blue-600 rounded-full"></div>
-                        )}
-                      </button>
-                    ))}
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {currentLesson?.videoUrl ? (
+                      <iframe 
+                        className="w-full h-full"
+                        src={currentLesson.videoUrl}
+                        title={currentLesson.title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    ) : (
+                      <div className="text-white text-lg">
+                        {currentLesson?.type === 'video' 
+                          ? `Playing: ${currentLesson?.title}` 
+                          : `This lesson is a ${currentLesson?.type} resource`}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            ))}
+            </div>
+
+            {/* Course Progress */}
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700">Your progress</span>
+                <span className="text-sm font-medium text-blue-600">{courseProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${courseProgress}%` }}></div>
+              </div>
+            </div>
+            
+            {/* Lesson Information */}
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{currentLesson?.title}</h2>
+              <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                <span>{currentLesson?.duration}</span>
+                <span>•</span>
+                <span>{currentLesson?.type || 'content'}</span>
+                <span>•</span>
+                <button 
+                  onClick={() => toggleLessonCompletion(currentLesson?.id)}
+                  className="flex items-center gap-1 text-blue-600 hover:underline"
+                >
+                  {completedLessons.includes(currentLesson?.id) ? 'Mark as incomplete' : 'Mark as complete'}
+                </button>
+              </div>
+              
+              {currentLesson?.description && (
+                <div className="bg-gray-50 p-3 rounded-md mb-4 text-gray-700">
+                  {currentLesson.description}
+                </div>
+              )}
+              
+              {/* Module progress information */}
+              <div className="text-sm text-gray-600">
+                <span>Module: </span>
+                <span className="font-medium">{course?.modules[activeModule]?.title}</span>
+                <span> • </span>
+                <span>Lesson {activeLesson + 1} of {course?.modules[activeModule]?.lessons.length}</span>
+              </div>
+              
+              {/* Lesson navigation */}
+              <div className="flex justify-between mt-4">
+                <button
+                  onClick={navigateToPreviousLesson}
+                  disabled={activeModule === 0 && activeLesson === 0}
+                  className={`flex items-center gap-2 px-4 py-2 border rounded-md ${
+                    activeModule === 0 && activeLesson === 0
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-blue-600 text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path>
+                  </svg>
+                  Previous
+                </button>
+                
+                <button
+                  onClick={navigateToNextLesson}
+                  disabled={
+                    activeModule === course?.modules.length - 1 && 
+                    activeLesson === course?.modules[activeModule]?.lessons.length - 1
+                  }
+                  className={`flex items-center gap-2 px-4 py-2 border rounded-md ${
+                    activeModule === course?.modules.length - 1 && 
+                    activeLesson === course?.modules[activeModule]?.lessons.length - 1
+                      ? 'border-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'border-blue-600 text-blue-600 hover:bg-blue-50'
+                  }`}
+                >
+                  Next
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Notes Section */}
+            <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Lesson Notes</h3>
+              <div className="mb-4">
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Add notes for this lesson..."
+                  className="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  rows="3"
+                ></textarea>
+                <button
+                  onClick={handleAddNote}
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                >
+                  Save Note
+                </button>
+              </div>
+              
+              {currentLessonNotes.length > 0 ? (
+                <div className="space-y-3">
+                  {currentLessonNotes.map(note => (
+                    <div key={note.id} className="bg-white p-3 rounded-md border border-gray-200">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-xs text-gray-500">
+                          {new Date(note.timestamp).toLocaleString()}
+                        </span>
+                        <button 
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"></path>
+                          </svg>
+                        </button>
+                      </div>
+                      <p className="text-gray-700 whitespace-pre-wrap">{note.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 italic">No notes for this lesson yet.</p>
+              )}
+            </div>
+            
+            {/* Resources Section */}
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Resources</h3>
+              
+              <div className="space-y-2">
+                <a href="#" className="flex items-center p-3 bg-white rounded-md border border-gray-200 hover:bg-blue-50">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <span className="font-medium">Lesson Slides</span>
+                </a>
+                
+                <a href="#" className="flex items-center p-3 bg-white rounded-md border border-gray-200 hover:bg-blue-50">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <span className="font-medium">Code Examples</span>
+                </a>
+                
+                <a href="#" className="flex items-center p-3 bg-white rounded-md border border-gray-200 hover:bg-blue-50">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-md flex items-center justify-center mr-3">
+                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"></path>
+                    </svg>
+                  </div>
+                  <span className="font-medium">Additional Reading</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Completion message shown only when all lessons are completed and quiz not yet taken */}
+            {isCourseFinished && !isQuizDone && (
+              <div className="bg-white p-6 border border-gray-200 rounded-lg text-center mb-6">
+                <p className="font-bold mb-2">Congratulations! You've completed all lessons.</p>
+                <p className="mb-4">Take the quiz to test your knowledge and earn a certificate.</p>
+                <button 
+                  onClick={navigateToQuiz}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Take Quiz
+                </button>
+              </div>
+            )}
+
+            {/* Certificate message shown when course and quiz are completed */}
+            {isCourseFinished && isQuizDone && (
+              <div className="bg-white p-6 border border-gray-200 rounded-lg text-center mb-6">
+                <p className="font-bold mb-2">Course and Quiz Completed!</p>
+                <p className="mb-4">You've successfully completed both the course and the quiz.</p>
+                <button 
+                  onClick={() => navigate(`/courses/${courseId}/certificate`)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  View Certificate
+                </button>
+              </div>
+            )}
           </div>
-          
-          {/* Additional Resources Section */}
-          <div className="border-t border-gray-200 p-4 mt-4">
-            <h3 className="font-bold text-gray-800 mb-3">Additional Resources</h3>
-            <ul className="space-y-2">
-              <li>
-                <a href="#" className="flex items-center text-blue-600 hover:text-blue-800 transition-colors">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 00-1.414-1.414L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                  </svg>
-                  Course materials (PDF)
-                </a>
-              </li>
-              <li>
-                <a href="#" className="flex items-center text-blue-600 hover:text-blue-800 transition-colors">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"></path>
-                    <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"></path>
-                  </svg>
-                  Discussion forum
-                </a>
-              </li>
-              <li>
-                <a href="#" className="flex items-center text-blue-600 hover:text-blue-800 transition-colors">
-                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                  </svg>
-                  Get help from instructor
-                </a>
-              </li>
-            </ul>
+
+          {/* Course Contents Sidebar */}
+          <div className="w-full md:w-1/3">
+            <div className="bg-gray-50 rounded-lg p-4 sticky top-20"> {/* Make sidebar sticky */}
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center justify-between">
+                Course Contents
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </h2>
+              
+              {isEnrolled ? (
+                <div className="divide-y divide-gray-200">
+                  {course?.modules.map((module, moduleIndex) => (
+                    <div key={module.id} className="py-3">
+                      <div className="flex items-center justify-between cursor-pointer" onClick={() => handleModuleClick(moduleIndex)}>
+                        <h3 className="text-sm font-medium text-gray-900">{module.title}</h3>
+                        <div className="flex items-center text-gray-400 text-xs">
+                          <span>{module.lessons.length} videos</span>
+                        </div>
+                      </div>
+                      
+                      {activeModule === moduleIndex && (
+                        <div className="mt-2 space-y-2 pl-2">
+                          {module.lessons.map((lesson, lessonIndex) => (
+                            <div 
+                              key={lesson.id} 
+                              className={`flex items-center py-1 px-2 rounded-md text-sm ${
+                                activeModule === moduleIndex && activeLesson === lessonIndex
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'text-gray-700 hover:bg-gray-100 cursor-pointer'
+                              }`}
+                              onClick={() => handleLessonClick(moduleIndex, lessonIndex)}
+                            >
+                              <div className="mr-3 flex-shrink-0">
+                                {lesson.type === 'video' ? (
+                                  <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd"></path>
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd"></path>
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="flex-grow">
+                                <p>{lesson.title}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-gray-500">
+                                    {lesson.duration}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleLessonCompletion(lesson.id);
+                                    }}
+                                    className="ml-2"
+                                  >
+                                    {completedLessons.includes(lesson.id) ? (
+                                      <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                                      </svg>
+                                    ) : (
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <div className="mb-3 text-gray-500">
+                    You need to enroll in this course to access the full content
+                  </div>
+                  <button 
+                    onClick={() => navigate(`/courses/${courseId}`)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                  >
+                    Go to Course Details
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
