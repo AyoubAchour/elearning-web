@@ -1,7 +1,14 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import pattern from '../../assets/images/Patern.svg';
 
 const PricingCard = ({ title, price, period, features, discount }) => {
+  const navigate = useNavigate();
+
+  const handleSubscribe = () => {
+    navigate('/subscribe');
+  };
+
   return (
     <div className="bg-white rounded-2xl relative overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-300">
       {/* Pattern background */}
@@ -38,7 +45,10 @@ const PricingCard = ({ title, price, period, features, discount }) => {
         </div>
         
         {/* Subscribe button */}
-        <button className="w-full py-4 px-6 bg-[#7F56D9] text-white rounded-xl font-semibold hover:bg-[#6941C6] transition-colors duration-200 text-lg">
+        <button 
+          onClick={handleSubscribe}
+          className="w-full py-4 px-6 bg-[#7F56D9] text-white rounded-xl font-semibold hover:bg-[#6941C6] transition-colors duration-200 text-lg"
+        >
           Subscribe
         </button>
         

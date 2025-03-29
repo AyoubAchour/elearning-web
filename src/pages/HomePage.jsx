@@ -5,7 +5,7 @@ import WhoIsElearning from '../components/home/WhoIsElearning';
 import PopularCourses from '../components/home/PopularCourses';
 import PricingPlans from '../components/home/PricingPlans';
 import SuccessStats from '../components/home/SuccessStats';
-import Newsletter from '../components/home/Newsletter';
+
 
 const HomePage = () => {
     return (
@@ -16,7 +16,6 @@ const HomePage = () => {
             <PopularCourses />
             <PricingPlans />
             <SuccessStats />
-            <Newsletter />
             {/* Other sections will be added here */}
         </div>
     );
