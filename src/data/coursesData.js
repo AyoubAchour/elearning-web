@@ -22,7 +22,7 @@ export const coursesData = [
     level: "Beginner",
     language: "English",
     lastUpdate: "August 2023",
-    image: "https://images.unsplash.com/photo-1432888622747-4eb9a8f5a70d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1074&q=80",
+    image: "https://images.unsplash.com/photo-1432888498266-38ffec3eaf0a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTZ8fHNlbyUyMGFuZCUyMG1hcmtldGluZ3xlbnwwfHwwfHx8MA%3D%3D",
     categories: ["Marketing", "Digital", "Business"],
     tags: ["SEO", "Social Media", "Digital Marketing", "Google Analytics"],
     features: [

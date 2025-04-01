@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { isAuthenticated, getCurrentUser } from "../../utils/auth";
+import { isAuthenticated, getCurrentUser, isAdmin, isInstructor } from "../../utils/auth";
 import profilePicture from "../../assets/images/profile-picture.svg";
 
 const Navbar = () => {
@@ -9,6 +9,8 @@ const Navbar = () => {
   const [language, setLanguage] = useState("en");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [userIsAdmin, setUserIsAdmin] = useState(false);
+  const [userIsInstructor, setUserIsInstructor] = useState(false);
   const location = useLocation();
   const isHomePage = location.pathname === "/";
 
@@ -20,8 +22,12 @@ const Navbar = () => {
       
       if (authStatus) {
         setCurrentUser(getCurrentUser());
+        setUserIsAdmin(isAdmin());
+        setUserIsInstructor(isInstructor());
       } else {
         setCurrentUser(null);
+        setUserIsAdmin(false);
+        setUserIsInstructor(false);
       }
     };
     
@@ -60,6 +66,13 @@ const Navbar = () => {
     setLanguage(language === "en" ? "ar" : "en");
   };
 
+  const navigation = [
+    { name: 'Home', href: '/' },
+    { name: 'About', href: '/#about' },
+    { name: 'Courses', href: '/courses' },
+    { name: 'Contact', href: '/#contact' },
+  ];
+
   return (
     <nav className="bg-transparent sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -76,15 +89,15 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
             <div className="flex items-center space-x-4 mr-4">
-              {["Home", "Courses", "About", "Contact"].map((item) => (
+              {navigation.map((item) => (
                 <Link
-                  key={item}
-                  to={`/${item.toLowerCase()}`}
+                  key={item.name}
+                  to={item.href}
                   className={`${
                     isHomePage ? "text-white" : "text-gray-800"
                   } hover:text-blue-300 px-3 py-2 text-sm font-medium`}
                 >
-                  {item}
+                  {item.name}
                 </Link>
               ))}
             </div>
@@ -148,6 +161,24 @@ const Navbar = () => {
                       <p className="text-sm font-medium text-gray-900 truncate">{currentUser?.fullName}</p>
                       <p className="text-sm text-gray-500 truncate">{currentUser?.email}</p>
                     </div>
+                    {userIsAdmin && (
+                      <Link
+                        to="/admin"
+                        className="block px-4 py-2 text-sm text-blue-700 hover:bg-gray-100 font-medium"
+                        onClick={() => setIsProfileMenuOpen(false)}
+                      >
+                        Admin Dashboard
+                      </Link>
+                    )}
+                    {userIsInstructor && (
+                      <Link
+                        to="/instructor"
+                        className="block px-4 py-2 text-sm text-green-700 hover:bg-gray-100 font-medium"
+                        onClick={() => setIsProfileMenuOpen(false)}
+                      >
+                        Instructor Dashboard
+                      </Link>
+                    )}
                     <Link
                       to="/profile"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -300,13 +331,13 @@ const Navbar = () => {
           id="mobile-menu"
         >
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            {["Home", "Courses", "About", "Contact"].map((item) => (
+            {navigation.map((item) => (
               <Link
-                key={item}
-                to={`/${item.toLowerCase()}`}
+                key={item.name}
+                to={item.href}
                 className="block px-3 py-2 rounded-md text-base font-medium text-white hover:text-blue-300 hover:bg-blue-600/20"
               >
-                {item}
+                {item.name}
               </Link>
             ))}
 

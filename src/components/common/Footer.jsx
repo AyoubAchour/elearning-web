@@ -5,7 +5,7 @@ import appStore from '../../assets/images/app-store.png';
 
 const Newsletter = () => {
     return (
-        <section className="bg-gradient-to-r from-blue-600 to-purple-600 py-16 px-4">
+        <section id="contact" className="bg-gradient-to-r from-blue-600 to-purple-600 py-16 px-4">
             <div className="max-w-7xl mx-auto">
                 <div className="flex flex-col items-center text-white">
                     {/* Logo and Social Links */}
@@ -81,4 +81,8 @@ const Newsletter = () => {
     );
 };
 
-export default Newsletter;
+const Footer = () => {
+    return <Newsletter />;
+};
+
+export default Footer;

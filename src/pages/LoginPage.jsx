@@ -82,6 +82,61 @@ const LoginPage = () => {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1500));
       
+      // Check if trying to login as admin (in a real app, this would be secure and server-side)
+      const adminEmail = "admin@example.com";
+      const adminPassword = "admin123";
+      
+      if (formData.email === adminEmail && formData.password === adminPassword) {
+        // Create admin session
+        const adminSession = {
+          id: "admin-1",
+          fullName: "Administrator",
+          email: adminEmail,
+          isAdmin: true,
+          isLoggedIn: true,
+          loginTime: new Date().toISOString()
+        };
+        
+        // Save admin session
+        if (formData.rememberMe) {
+          localStorage.setItem('currentUser', JSON.stringify(adminSession));
+        } else {
+          sessionStorage.setItem('currentUser', JSON.stringify(adminSession));
+        }
+        
+        // Navigate to admin dashboard
+        navigate('/admin');
+        return;
+      }
+      
+      // Check if trying to login as instructor
+      const instructorEmail = "instructor@example.com";
+      const instructorPassword = "instructor123";
+      
+      if (formData.email === instructorEmail && formData.password === instructorPassword) {
+        // Create instructor session
+        const instructorSession = {
+          id: "instructor-1",
+          fullName: "John Instructor",
+          email: instructorEmail,
+          role: "instructor",
+          isLoggedIn: true,
+          loginTime: new Date().toISOString()
+        };
+        
+        // Save instructor session
+        if (formData.rememberMe) {
+          localStorage.setItem('currentUser', JSON.stringify(instructorSession));
+        } else {
+          sessionStorage.setItem('currentUser', JSON.stringify(instructorSession));
+        }
+        
+        // Navigate to instructor dashboard
+        navigate('/instructor');
+        return;
+      }
+      
+      // Regular user login (existing code)
       // Get users from localStorage
       const users = JSON.parse(localStorage.getItem('users') || '[]');
       

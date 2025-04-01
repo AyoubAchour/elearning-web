@@ -1,9 +1,17 @@
 import React from 'react';
-// Remove direct imports and use public URLs instead
-// import instructorImage from '../../assets/images/Instructor.png';
-// import studentsImage from '../../assets/images/Students.png';
+import { useNavigate } from 'react-router-dom';
 
 const UserTypeCard = ({ type, title, buttonText, imageSrc }) => {
+    const navigate = useNavigate();
+
+    const handleClick = () => {
+        if (type === 'instructor') {
+            navigate('/apply-instructor');
+        } else {
+            navigate('/subscribe');
+        }
+    };
+
     return (
         <div className="rounded-lg overflow-hidden shadow-md bg-white relative h-64">
             {/* Background image with overlay */}
@@ -13,9 +21,16 @@ const UserTypeCard = ({ type, title, buttonText, imageSrc }) => {
                     alt={`${title} background`} 
                     className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 bg-opacity-30 flex flex-col justify-center items-center p-6 text-white">
-                    <h3 className="text-xl font-bold mb-6">{title}</h3>
-                    <button className={`px-5 py-2 rounded-full ${type === 'instructor' ? 'bg-white text-gray-800' : 'bg-blue-500 text-white'} font-medium hover:shadow-lg transition duration-300`}>
+                <div className="absolute inset-0  bg-opacity-30 flex flex-col justify-center items-center p-6 text-white">
+                    <h3 className="text-2xl font-bold mb-6">{title}</h3>
+                    <button 
+                        onClick={handleClick}
+                        className={`px-6 py-3 rounded-full ${
+                            type === 'instructor' 
+                                ? 'bg-white text-gray-800 hover:bg-gray-100' 
+                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                        } font-medium hover:shadow-lg transition duration-300 transform hover:scale-105`}
+                    >
                         {buttonText}
                     </button>
                 </div>

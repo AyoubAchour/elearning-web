@@ -1,7 +1,16 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import BackgroundHero from '../../assets/images/BackgroundHero.png';
 
+
+
 const HeroSection = () => {
+    const navigate = useNavigate();
+    
+    const handleSubscribe = () => {
+        navigate('/subscribe');
+      };
+
     return (
         <div className="relative overflow-hidden min-h-screen">
             {/* Background Image - positioned to extend behind navbar */}
@@ -28,7 +37,9 @@ const HeroSection = () => {
                         Our mission is to help people to find the best course - online and learn with expert anywhere
                     </p>
                     <div className="mt-10">
-                        <button className="px-8 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition duration-300 shadow-lg">
+                        <button className="px-8 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition duration-300 shadow-lg"
+                        onClick={handleSubscribe}
+                        >
                             Subscribe Now
                         </button>
                     </div>

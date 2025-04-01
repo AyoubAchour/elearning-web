@@ -3,25 +3,19 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from '../common/Navbar';
 import Footer from '../common/Footer';
 
-const MainLayout = () => {
+const MainLayout = ({ children }) => {
     const location = useLocation();
     const isCourseDetailPage = location.pathname.match(/^\/courses\/\d+$/);
+    const shouldOverlayNavbar = location.pathname === '/' || location.pathname === '/courses';
 
     return (
-        <div className="flex flex-col min-h-screen relative">
-            {/* Navbar positioned absolutely to overlay content */}
-            {!isCourseDetailPage && (
-                <div className="absolute top-0 left-0 right-0 z-50">
-                    <Navbar />
-                </div>
-            )}
-            
-            {/* Main content with padding to account for navbar */}
-            <main className="flex-grow">
-                <Outlet />
+        <div className="min-h-screen flex flex-col">
+            <div className={`${shouldOverlayNavbar ? 'absolute w-full z-50' : ''}`}>
+                <Navbar />
+            </div>
+            <main className={`flex-grow ${!shouldOverlayNavbar ? 'pt-16' : ''}`}>
+                {children || <Outlet />}
             </main>
-            
-            {/* Don't show the footer on course detail pages */}
             {!isCourseDetailPage && <Footer />}
         </div>
     );

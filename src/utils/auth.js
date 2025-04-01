@@ -143,4 +143,22 @@ export const updateUserProfile = (updatedData) => {
   }
   
   return true;
+};
+
+/**
+ * Check if the current user is an admin
+ * @returns {boolean} True if user is an admin
+ */
+export const isAdmin = () => {
+  const user = getCurrentUser();
+  return user && user.isAdmin === true;
+};
+
+/**
+ * Check if the current user is an instructor
+ * @returns {boolean} True if user is an instructor
+ */
+export const isInstructor = () => {
+  const user = getCurrentUser();
+  return user && user.role === 'instructor';
 }; 
