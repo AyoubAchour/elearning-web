@@ -1,21 +1,28 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { logout } from '../utils/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 const LogoutPage = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   useEffect(() => {
     // Perform logout operation
-    logout();
+    const performLogout = async () => {
+      try {
+        await logout();
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        // Redirect to home page after a short delay regardless of success/failure
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 1500);
+      }
+    };
     
-    // Redirect to home page after a short delay
-    const timer = setTimeout(() => {
-      navigate('/', { replace: true });
-    }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, [navigate]);
+    performLogout();
+  }, [navigate, logout]);
 
   return (
     <div className="min-h-screen bg-blue-50 flex flex-col items-center justify-center px-4">

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login, currentUser, loading: authLoading, error: authError } = useAuth();
+  
   const [successMessage, setSuccessMessage] = useState('');
   const [formData, setFormData] = useState({
     email: '',
@@ -16,7 +19,7 @@ const LoginPage = () => {
   // Get the redirect path from location state or default to courses
   const from = location.state?.from || '/courses';
 
-  // Check for success message from signup
+  // Check for success message from signup and redirect if already logged in
   useEffect(() => {
     if (location.state?.message) {
       setSuccessMessage(location.state.message);
@@ -26,11 +29,10 @@ const LoginPage = () => {
     }
     
     // Check if user is already logged in
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || sessionStorage.getItem('currentUser'));
     if (currentUser) {
       navigate(from); // Redirect to the original requested page or courses
     }
-  }, [location, navigate, from]);
+  }, [location, navigate, from, currentUser]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -79,105 +81,36 @@ const LoginPage = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call login function from auth context
+      const credentials = {
+        email: formData.email,
+        password: formData.password,
+        rememberMe: formData.rememberMe
+      };
       
-      // Check if trying to login as admin (in a real app, this would be secure and server-side)
-      const adminEmail = "admin@example.com";
-      const adminPassword = "admin123";
+      const response = await login(credentials);
       
-      if (formData.email === adminEmail && formData.password === adminPassword) {
-        // Create admin session
-        const adminSession = {
-          id: "admin-1",
-          fullName: "Administrator",
-          email: adminEmail,
-          isAdmin: true,
-          isLoggedIn: true,
-          loginTime: new Date().toISOString()
-        };
-        
-        // Save admin session
-        if (formData.rememberMe) {
-          localStorage.setItem('currentUser', JSON.stringify(adminSession));
-        } else {
-          sessionStorage.setItem('currentUser', JSON.stringify(adminSession));
-        }
-        
-        // Navigate to admin dashboard
+      // Check user role for redirection
+      if (response?.user?.isAdmin) {
         navigate('/admin');
-        return;
-      }
-      
-      // Check if trying to login as instructor
-      const instructorEmail = "instructor@example.com";
-      const instructorPassword = "instructor123";
-      
-      if (formData.email === instructorEmail && formData.password === instructorPassword) {
-        // Create instructor session
-        const instructorSession = {
-          id: "instructor-1",
-          fullName: "John Instructor",
-          email: instructorEmail,
-          role: "instructor",
-          isLoggedIn: true,
-          loginTime: new Date().toISOString()
-        };
-        
-        // Save instructor session
-        if (formData.rememberMe) {
-          localStorage.setItem('currentUser', JSON.stringify(instructorSession));
-        } else {
-          sessionStorage.setItem('currentUser', JSON.stringify(instructorSession));
-        }
-        
-        // Navigate to instructor dashboard
+      } else if (response?.user?.role === 'instructor') {
         navigate('/instructor');
-        return;
-      }
-      
-      // Regular user login (existing code)
-      // Get users from localStorage
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
-      
-      // Find user with matching email
-      const user = users.find(user => user.email === formData.email);
-      
-      // Check if user exists and password matches
-      if (user && user.password === formData.password) {
-        // Create a user session object (excluding password)
-        const userSession = {
-          id: user.id,
-          fullName: user.fullName,
-          email: user.email,
-          isLoggedIn: true,
-          loginTime: new Date().toISOString()
-        };
-        
-        // Save to localStorage (with or without remember me)
-        if (formData.rememberMe) {
-          localStorage.setItem('currentUser', JSON.stringify(userSession));
-        } else {
-          sessionStorage.setItem('currentUser', JSON.stringify(userSession));
-        }
-        
+      } else {
         // Navigate to the original requested page or courses
         navigate(from);
-      } else {
-        // Show error for invalid credentials
-        setErrors({
-          form: 'Invalid email or password. Please try again.'
-        });
       }
     } catch (error) {
       console.error('Login error:', error);
       setErrors({
-        form: 'Failed to login. Please try again.'
+        form: error.response?.data?.message || authError || 'Invalid email or password. Please try again.'
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Check for external loading state from auth context
+  const loading = isLoading || authLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -202,9 +135,9 @@ const LoginPage = () => {
             </div>
           )}
           
-          {errors.form && (
+          {(errors.form || authError) && (
             <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
-              <p>{errors.form}</p>
+              <p>{errors.form || authError}</p>
             </div>
           )}
           
@@ -256,28 +189,30 @@ const LoginPage = () => {
               )}
             </div>
             
-            <div className="flex items-center">
-              <input
-                id="rememberMe"
-                name="rememberMe"
-                type="checkbox"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
-                Remember me
-              </label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="rememberMe"
+                  name="rememberMe"
+                  type="checkbox"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
+                  Remember me
+                </label>
+              </div>
             </div>
             
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               className={`w-full bg-blue-600 text-white py-3 rounded-lg font-medium text-base
-                ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'} 
+                ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'} 
                 transition-colors shadow-md`}
             >
-              {isLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center">
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -285,15 +220,15 @@ const LoginPage = () => {
                   </svg>
                   Logging in...
                 </div>
-              ) : 'Log in'}
+              ) : 'Log In'}
             </button>
           </form>
           
-          <div className="mt-6 text-center">
+          <div className="mt-8 text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
               <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-800">
-                Sign up for free
+                Sign up
               </Link>
             </p>
           </div>
@@ -325,34 +260,32 @@ const LoginPage = () => {
           </div>
         </div>
         
-        {/* Right side - Image/Illustration */}
-        <div className="hidden md:block relative bg-blue-600">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-700"></div>
+        {/* Right side - Welcome Message */}
+        <div className="hidden md:block relative bg-gradient-to-br from-blue-500 to-indigo-700">
           <div className="absolute inset-0 bg-pattern opacity-10"></div>
           <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-white">
             <div className="max-w-md text-center">
-              <h2 className="text-2xl font-bold mb-6">Unlock your learning potential</h2>
+              <h2 className="text-2xl font-bold mb-6">Welcome back to your learning journey</h2>
               <div className="h-1 w-20 bg-blue-300 rounded mx-auto mb-6"></div>
-              <p className="mb-8">Access all our courses, track your progress, and connect with expert instructors to take your skills to the next level.</p>
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>Access to all courses</span>
+              <p className="mb-8">Continue your education with our expert-led courses and unlock new opportunities for personal and professional growth.</p>
+              
+              <div className="mt-10 bg-blue-700/30 p-5 rounded-lg border border-blue-400/30">
+                <div className="flex flex-col items-center mb-4">
+                  <div className="w-16 h-16 rounded-full bg-blue-200 mb-3 overflow-hidden">
+                    <img src="/images/testimonials/user1.jpg" alt="Student" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <svg key={star} className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>Learning progress tracking</span>
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-300" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>Certificates of completion</span>
-                </div>
+                <blockquote className="italic text-sm">
+                  "The courses on this platform helped me transition into a new career. The instructors are amazing and the community support is incredibly helpful."
+                </blockquote>
+                <p className="mt-2 text-blue-200 font-medium">— Michael Chen, Software Engineer</p>
               </div>
             </div>
           </div>

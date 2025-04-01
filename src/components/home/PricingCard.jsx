@@ -1,12 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import pattern from '../../assets/images/Patern.svg';
+import { createCheckoutSession } from '../../services/api';
 
-const PricingCard = ({ title, price, period, features, discount }) => {
+const PricingCard = ({ id, title, price, period, features, discount }) => {
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubscribe = () => {
-    navigate('/subscribe');
+  const handleSubscribe = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // For demonstration purposes; in a real app, you'd get the user ID from context/redux
+      const userId = localStorage.getItem('userId') || '64f5ebe3d2a26e001c4b2338'; // Fallback to a dummy ID
+      
+      // Create a checkout session (not using the return value in this demo)
+      await createCheckoutSession(id, userId);
+      
+      // In a real implementation, you'd redirect to Stripe checkout using the session ID
+      // const { id: sessionId } = await createCheckoutSession(id, userId);
+      // window.location.href = `https://checkout.stripe.com/c/pay/${sessionId}`;
+      
+      // For demo purposes, just navigate to a success page
+      navigate('/subscribe', { state: { plan: title } });
+      
+    } catch (err) {
+      console.error('Failed to initiate checkout:', err);
+      setError('Failed to process subscription. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -47,10 +72,18 @@ const PricingCard = ({ title, price, period, features, discount }) => {
         {/* Subscribe button */}
         <button 
           onClick={handleSubscribe}
-          className="w-full py-4 px-6 bg-[#7F56D9] text-white rounded-xl font-semibold hover:bg-[#6941C6] transition-colors duration-200 text-lg"
+          disabled={isLoading}
+          className={`w-full py-4 px-6 ${
+            isLoading ? 'bg-gray-400' : 'bg-[#7F56D9] hover:bg-[#6941C6]'
+          } text-white rounded-xl font-semibold transition-colors duration-200 text-lg`}
         >
-          Subscribe
+          {isLoading ? 'Processing...' : 'Subscribe'}
         </button>
+        
+        {/* Error message */}
+        {error && (
+          <p className="text-red-500 text-sm mt-2 text-center">{error}</p>
+        )}
         
         {/* Discount badge */}
         {discount && (

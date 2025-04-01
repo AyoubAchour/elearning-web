@@ -1,12 +1,17 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { isAuthenticated, isInstructor } from '../../utils/auth';
+import { useAuth } from '../../contexts/AuthContext';
 
 const InstructorRoute = () => {
   const location = useLocation();
-  const isAuth = isAuthenticated();
-  const userIsInstructor = isInstructor();
+  const { currentUser, isAuthenticated, loading } = useAuth();
+  const userIsInstructor = currentUser?.role === 'instructor';
 
-  if (!isAuth) {
+  // If auth is still loading, we could show a loading spinner
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
     // Redirect to login page with the return url
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }

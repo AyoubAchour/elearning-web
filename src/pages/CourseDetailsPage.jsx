@@ -1,34 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { coursesData } from '../data/coursesData';
-import { extendedCoursesData } from '../data/extendedCoursesData';
 import { isAuthenticated, hasActiveSubscription, getEnrolledCourses, enrollInCourse } from '../utils/auth';
 import CourseDetailNavbar from '../components/courses/CourseDetailNavbar';
+import { fetchCourseById } from '../services/api';
 
 const CourseDetailsPage = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const [course, setCourse] = useState(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [expandedModules, setExpandedModules] = useState({});
   const [userRating, setUserRating] = useState(0);
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewContent, setReviewContent] = useState('');
   
-  // Try to find the course in extended data first, then fall back to regular data
-  const course = 
-    extendedCoursesData.find(c => c.id === parseInt(courseId)) || 
-    coursesData.find(c => c.id === parseInt(courseId));
-
   useEffect(() => {
-    // Check if user is already enrolled in this course
-    if (isAuthenticated()) {
-      const enrolledCourses = getEnrolledCourses();
-      if (enrolledCourses.includes(courseId)) {
-        setIsEnrolled(true);
+    const fetchCourseData = async () => {
+      try {
+        setLoading(true);
+        const courseData = await fetchCourseById(courseId);
+        setCourse(courseData);
+        setError(null);
+        
+        // Check if user is already enrolled in this course
+        if (isAuthenticated()) {
+          const enrolledCourses = getEnrolledCourses();
+          if (enrolledCourses.includes(courseId)) {
+            setIsEnrolled(true);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching course:', err);
+        setError('Failed to load course details. Please try again later.');
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+
+    fetchCourseData();
   }, [courseId]);
 
   const handleEnrollClick = () => {
@@ -101,6 +113,28 @@ const CourseDetailsPage = () => {
     setReviewContent('');
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 text-center">
+        <p className="text-xl text-red-600 mb-4">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   if (!course) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -111,15 +145,15 @@ const CourseDetailsPage = () => {
 
   return (
     <>
-      <CourseDetailNavbar courseTitle={course.title} />
+      <CourseDetailNavbar courseTitle={course.nom} />
       
-      <div className="min-h-screen bg-white pt-16">
+      <div className="min-h-screen bg-white">
         {/* Hero Section with Background Image */}
-        <div className="relative h-[400px]">
+        <div className="relative h-[400px] -mt-[64px]">
           <div className="absolute inset-0">
             <img 
-              src={course.image} 
-              alt={course.title} 
+              src={course.image || 'https://via.placeholder.com/1200x400?text=No+Image'} 
+              alt={course.nom} 
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-black/50" />
@@ -168,91 +202,97 @@ const CourseDetailsPage = () => {
               </div>
 
               {/* Course Title */}
-              <h1 className="text-3xl font-bold text-gray-900 mb-6">{course.title}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-6">{course.nom}</h1>
 
               {/* Course Description */}
               {activeTab === 'overview' && (
                 <>
-              {/* Instructor Info */}
-              <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-blue-100 rounded-full overflow-hidden">
-                  <img src="https://via.placeholder.com/48" alt="Instructor" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">Mohammed saad</h3>
-                  <p className="text-sm text-gray-600">Web Developer, Researcher, Instructor at CodeLab</p>
-                </div>
-              </div>
+                  {/* Instructor Info */}
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full overflow-hidden">
+                      <img 
+                        src={course.professeurId?.image && !course.professeurId.image.startsWith('http') 
+                          ? `http://localhost:3000/uploads/${course.professeurId.image}` 
+                          : course.professeurId?.image || 'https://via.placeholder.com/48?text=Instructor'} 
+                        alt={course.professeurId?.name || 'Instructor'} 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/48?text=Instructor';
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{course.professeurId?.name || 'Instructor'}</h3>
+                      <p className="text-sm text-gray-600">
+                        {course.professeurId?.speciality 
+                          ? `${course.professeurId.speciality}, Instructor at CodeLab` 
+                          : 'Web Developer, Researcher, Instructor at CodeLab'}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="prose max-w-none">
-                <p className="text-gray-600 leading-relaxed">
-                  Lorem ipsum is the standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.
-                </p>
-              </div>
+                  <div className="prose max-w-none">
+                    <p className="text-gray-600 leading-relaxed">
+                      {course.description || 'No description available for this course.'}
+                    </p>
+                  </div>
 
-              {/* Course Curriculum */}
-              {course.modules && (
-                <div className="mt-10">
-                  <h2 className="text-xl font-bold text-gray-800 mb-4">Course Curriculum</h2>
-                  <div className="border rounded-lg overflow-hidden divide-y divide-gray-200">
+                  {/* Course Curriculum */}
+                  {course.modules && course.modules.length > 0 && (
+                    <div className="mt-10">
+                      <h2 className="text-xl font-bold text-gray-800 mb-4">Course Curriculum</h2>
+                      <div className="border rounded-lg overflow-hidden divide-y divide-gray-200">
                         {course.modules.map((module, index) => {
-                          const totalDuration = module.lessons.reduce((acc, lesson) => {
-                            const minutes = parseInt(lesson.duration.split(':')[0]);
-                            return acc + (minutes || 0);
-                          }, 0);
+                          const totalDuration = module.lessons && module.lessons.length 
+                            ? module.lessons.reduce((acc, lesson) => {
+                                const minutes = parseInt((lesson.duration || '0:00').split(':')[0]);
+                                return acc + (minutes || 0);
+                              }, 0) 
+                            : 0;
                           
-                          const isExpanded = expandedModules[module.id] || false;
+                          const isExpanded = expandedModules[module._id] || false;
                           
                           return (
-                      <div key={module.id} className="bg-white">
+                            <div key={module._id} className="bg-white">
                               <div 
                                 className="p-4 hover:bg-gray-50 flex justify-between items-center cursor-pointer"
                                 onClick={() => setExpandedModules({
                                   ...expandedModules,
-                                  [module.id]: !isExpanded
+                                  [module._id]: !isExpanded
                                 })}
                               >
-                          <div>
-                            <h3 className="font-medium text-gray-900">
-                              {index + 1}. {module.title}
-                            </h3>
-                            <p className="text-sm text-gray-500">
-                                    {module.lessons.length} lessons • {totalDuration} min
-                            </p>
-                          </div>
+                                <div>
+                                  <h3 className="font-medium text-gray-900">
+                                    {index + 1}. {module.titre || 'Unnamed Module'}
+                                  </h3>
+                                  <p className="text-sm text-gray-500">
+                                    {module.videos?.length || 0} videos • {totalDuration} min
+                                  </p>
+                                </div>
                                 <svg 
                                   className={`w-5 h-5 text-gray-500 transition-transform ${isExpanded ? 'transform rotate-180' : ''}`}
                                   fill="currentColor" 
                                   viewBox="0 0 20 20"
                                 >
-                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"></path>
+                                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"></path>
                                 </svg>
                               </div>
                               
-                              {isExpanded && (
+                              {isExpanded && module.videos && module.videos.length > 0 && (
                                 <div className="border-t border-gray-100 bg-gray-50 divide-y divide-gray-100">
-                                  {module.lessons.map((lesson, lessonIndex) => (
-                                    <div key={lesson.id} className="p-3 pl-8 flex items-center justify-between">
+                                  {module.videos.map((video, videoIndex) => (
+                                    <div key={video._id} className="p-3 pl-8 flex items-center justify-between">
                                       <div className="flex items-center">
-                                        {lesson.type === 'video' ? (
-                                          <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                        ) : lesson.type === 'pdf' ? (
-                                          <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                          </svg>
-                                        ) : (
-                                          <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                          </svg>
-                                        )}
+                                        <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
                                         <div>
                                           <p className="text-sm font-medium text-gray-800">
-                                            {lessonIndex + 1}. {lesson.title}
+                                            {videoIndex + 1}. {video.titre || 'Unnamed Video'}
                                           </p>
-                                          {lesson.completed && (
+                                          {video.completed && (
                                             <span className="text-xs text-green-600">Completed</span>
                                           )}
                                         </div>
@@ -260,10 +300,10 @@ const CourseDetailsPage = () => {
                                       <div className="flex items-center">
                                         {isEnrolled ? (
                                           <button className="text-xs text-blue-600 hover:text-blue-700 mr-3">
-                                            {lesson.completed ? 'Review' : 'Start'}
+                                            {video.completed ? 'Review' : 'Start'}
                                           </button>
                                         ) : null}
-                                        <span className="text-xs text-gray-500">{lesson.duration}</span>
+                                        <span className="text-xs text-gray-500">{video.duration || '0:00'}</span>
                                       </div>
                                     </div>
                                   ))}
@@ -288,7 +328,7 @@ const CourseDetailsPage = () => {
                           className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
                           onClick={() => {
                             // Expand or collapse all modules
-                            const allModuleIds = course.modules.map(m => m.id);
+                            const allModuleIds = course.modules.map(m => m._id);
                             const allExpanded = allModuleIds.every(id => expandedModules[id]);
                             
                             if (allExpanded) {
@@ -304,7 +344,7 @@ const CourseDetailsPage = () => {
                             }
                           }}
                         >
-                          {course.modules.every(m => expandedModules[m.id]) 
+                          {course.modules.every(m => expandedModules[m._id]) 
                             ? 'Collapse All Sections' 
                             : 'Expand All Sections'}
                         </button>
@@ -320,33 +360,51 @@ const CourseDetailsPage = () => {
                   <div className="flex items-start gap-6 mb-8">
                     <div className="w-32 h-32 bg-blue-100 rounded-full overflow-hidden">
                       <img 
-                        src="https://via.placeholder.com/128" 
-                        alt={course.instructor} 
+                        src={course.professeurId?.image && !course.professeurId.image.startsWith('http') 
+                          ? `http://localhost:3000/uploads/${course.professeurId.image}` 
+                          : course.professeurId?.image || 'https://via.placeholder.com/128?text=Instructor'} 
+                        alt={course.professeurId?.name || 'Instructor'} 
                         className="w-full h-full object-cover" 
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/128?text=Instructor';
+                        }}
                       />
                     </div>
                     <div className="flex-1">
-                      <h2 className="text-2xl font-bold text-gray-900 mb-2">{course.instructor}</h2>
-                      <p className="text-gray-600 text-sm mb-4">Web Developer, Researcher, Instructor at CodeLab</p>
+                      <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                        {course.professeurId?.name || 'Instructor'}
+                      </h2>
+                      <p className="text-gray-600 text-sm mb-4">
+                        {course.professeurId?.speciality 
+                          ? `${course.professeurId.speciality}, Instructor at CodeLab` 
+                          : 'Web Developer, Researcher, Instructor at CodeLab'}
+                      </p>
                       
                       <div className="flex items-center gap-4 mb-4">
                         <div className="flex items-center">
                           <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                           </svg>
-                          <span className="ml-1 text-gray-700">{course.rating} Instructor Rating</span>
+                          <span className="ml-1 text-gray-700">
+                            {course.averageRating?.toFixed(1) || '0.0'} Instructor Rating
+                          </span>
                         </div>
                         <div className="flex items-center">
                           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                           </svg>
-                          <span className="ml-1 text-gray-700">{course.students} Students</span>
+                          <span className="ml-1 text-gray-700">
+                            {course.enrolledCount || 0} Students
+                          </span>
                         </div>
                         <div className="flex items-center">
                           <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
-                          <span className="ml-1 text-gray-700">12 Courses</span>
+                          <span className="ml-1 text-gray-700">
+                            {course.professeurId?.courseId?.length || 1} Courses
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -355,12 +413,29 @@ const CourseDetailsPage = () => {
                   <div className="mt-8 prose max-w-none">
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">About Me</h3>
                     <p className="text-gray-600 leading-relaxed mb-6">
-                      I am an experienced web developer and educator with over 10 years of industry experience. I specialize in modern web technologies including React, Node.js, and cloud platforms. My teaching approach focuses on practical, project-based learning that prepares students for real-world development challenges.
+                      {course.professeurId?.bio || 
+                        "I am an experienced web developer and educator with over 10 years of industry experience. I specialize in modern web technologies including React, Node.js, and cloud platforms. My teaching approach focuses on practical, project-based learning that prepares students for real-world development challenges."}
                     </p>
+                    {/* Default paragraph as fallback if no additional instructor info is available */}
                     <p className="text-gray-600 leading-relaxed">
                       Throughout my career, I've worked with startups and enterprise companies alike, helping them build scalable web applications and training their development teams. I'm passionate about sharing my knowledge and helping others grow in their tech careers.
                     </p>
                   </div>
+                  
+                  {/* Contact Information */}
+                  {course.professeurId?.email && (
+                    <div className="mt-8 bg-blue-50 p-6 rounded-lg">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h3>
+                      <div className="flex items-center gap-2 text-gray-700">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <a href={`mailto:${course.professeurId.email}`} className="text-blue-600 hover:underline">
+                          {course.professeurId.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -443,12 +518,12 @@ const CourseDetailsPage = () => {
                 <div className="py-4">
                   <div className="flex items-center gap-6 mb-8">
                     <div className="text-center">
-                      <div className="text-5xl font-bold text-gray-900 mb-1">{course.rating}</div>
+                      <div className="text-5xl font-bold text-gray-900 mb-1">{course.averageRating}</div>
                       <div className="flex items-center justify-center mb-1">
                         {[1, 2, 3, 4, 5].map((star) => (
                           <svg 
                             key={star}
-                            className={`w-5 h-5 ${star <= Math.floor(course.rating) ? 'text-yellow-400' : 'text-gray-300'}`} 
+                            className={`w-5 h-5 ${star <= Math.floor(course.averageRating) ? 'text-yellow-400' : 'text-gray-300'}`} 
                             fill="currentColor" 
                             viewBox="0 0 20 20"
                           >
@@ -676,8 +751,8 @@ const CourseDetailsPage = () => {
                 {/* Video Preview */}
                 <div className="relative aspect-video">
                   <img 
-                    src={course.image} 
-                    alt={course.title} 
+                    src={course.image || 'https://via.placeholder.com/400x300?text=No+Image'} 
+                    alt={course.nom} 
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -690,7 +765,7 @@ const CourseDetailsPage = () => {
                 </div>
 
                 <div className="p-6">
-                  <h2 className="text-xl font-semibold mb-6">{course.title}</h2>
+                  <h2 className="text-xl font-semibold mb-6">{course.nom}</h2>
                   
                   <div className="space-y-4 mb-6">
                     <div className="flex items-center gap-3">
@@ -709,7 +784,7 @@ const CourseDetailsPage = () => {
                       <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
-                      <span className="text-gray-600">{course.lessons} Modules</span>
+                      <span className="text-gray-600">{course.modules?.length || 0} Modules</span>
                     </div>
                   </div>
 

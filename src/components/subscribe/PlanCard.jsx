@@ -3,28 +3,38 @@ import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 
 const PlanCard = ({ 
+  id,
   title, 
   price, 
   period, 
   description, 
   features, 
   isActive,
-  onCardClick
+  onCardClick,
+  onSubscribe
 }) => {
   const navigate = useNavigate();
 
   const handleSubscribe = (e) => {
     e.stopPropagation(); // Prevent card click event
-    navigate('/checkout', {
-      state: {
-        plan: {
-          title,
-          price,
-          period,
-          features
+    
+    if (onSubscribe) {
+      // Use the provided onSubscribe callback
+      onSubscribe();
+    } else {
+      // Default behavior - navigate to checkout
+      navigate('/checkout', {
+        state: {
+          plan: {
+            id,
+            title,
+            price,
+            period,
+            features
+          }
         }
-      }
-    });
+      });
+    }
   };
 
   return (
@@ -108,13 +118,15 @@ const PlanCard = ({
 };
 
 PlanCard.propTypes = {
+  id: PropTypes.string,
   title: PropTypes.string.isRequired,
   price: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   period: PropTypes.string.isRequired,
   description: PropTypes.string.isRequired,
   features: PropTypes.arrayOf(PropTypes.string).isRequired,
   isActive: PropTypes.bool,
-  onCardClick: PropTypes.func.isRequired
+  onCardClick: PropTypes.func.isRequired,
+  onSubscribe: PropTypes.func
 };
 
 PlanCard.defaultProps = {

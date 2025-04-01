@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import scoreIcon from '../../assets/images/Score.svg';
 
-const CourseCard = ({ id, image, title, lessons, students, level, rating }) => {
+const CourseCard = ({ id, image, title, lessons, students, level, rating, category }) => {
   const navigate = useNavigate();
 
   const handleStartCourse = () => {
@@ -14,6 +14,11 @@ const CourseCard = ({ id, image, title, lessons, students, level, rating }) => {
     <div className="bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
       <img src={image} alt={title} className="w-full h-48 object-cover"/>
       <div className="p-6">
+        <div className="mb-2">
+          <span className="inline-block px-3 py-1 bg-blue-100 text-blue-600 text-xs font-semibold rounded-full">
+            {category}
+          </span>
+        </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4 line-clamp-2 min-h-[56px]">{title}</h3>
         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
           <div className="flex items-center gap-2">
@@ -61,13 +66,18 @@ const CourseCard = ({ id, image, title, lessons, students, level, rating }) => {
 };
 
 CourseCard.propTypes = {
-  id: PropTypes.number.isRequired,
+  id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   image: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
   lessons: PropTypes.number.isRequired,
   students: PropTypes.number.isRequired,
   level: PropTypes.string.isRequired,
-  rating: PropTypes.number.isRequired
+  rating: PropTypes.number.isRequired,
+  category: PropTypes.string
+};
+
+CourseCard.defaultProps = {
+  category: 'Uncategorized'
 };
 
 export default CourseCard;

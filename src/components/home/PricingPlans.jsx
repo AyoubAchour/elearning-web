@@ -1,48 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import PricingCard from './PricingCard';
+import { fetchPlans } from '../../services/api';
 
 const PricingPlans = () => {
-  const plans = [
-    {
-      title: "Monthly Plan",
-      price: "70.44",
-      period: "month",
-      features: [
-        "Unlimited access",
-        "Learn anytime, anywhere",
-        "Certification after completion",
-        "Access via web & mobile",
-        "Access the quiz"
-      ],
-      discount: null
-    },
-    {
-      title: "Three-Month Plan",
-      price: "25.16",
-      period: "month",
-      features: [
-        "Unlimited access with a 5% discount",
-        "Learn anytime, anywhere",
-        "Certification after completion",
-        "Access via web & mobile",
-        "Access the quiz"
-      ],
-      discount: 5
-    },
-    {
-      title: "Annual Plan",
-      price: "50.16",
-      period: "month",
-      features: [
-        "Unlimited access with a 20% discount",
-        "Learn anytime, anywhere",
-        "Certification after completion",
-        "Access via web & mobile",
-        "Access the quiz"
-      ],
-      discount: 20
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const getPlans = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchPlans();
+        setPlans(data);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch subscription plans:', err);
+        setError('Failed to load subscription plans. Please try again later.');
+        setPlans([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getPlans();
+  }, []);
+
+  // Map backend plan data to frontend format
+  const mapPlanData = (plan) => {
+    let features = [];
+    try {
+      features = JSON.parse(plan.offers);
+    } catch {
+      // If offers is not valid JSON, use it as a single string
+      features = plan.offers ? [plan.offers] : [];
     }
-  ];
+
+    let discount = null;
+    // Extract discount percentage from features if it exists
+    const discountFeature = features.find(feature => feature.includes('discount'));
+    if (discountFeature) {
+      const match = discountFeature.match(/(\d+)%/);
+      if (match && match[1]) {
+        discount = parseInt(match[1]);
+      }
+    }
+
+    return {
+      id: plan._id,
+      title: plan.name,
+      price: plan.price.toFixed(2),
+      period: plan.duration,
+      features: features,
+      discount: discount
+    };
+  };
 
   return (
     <section className="py-16 px-4 md:px-8 max-w-7xl mx-auto">
@@ -53,18 +65,22 @@ const PricingPlans = () => {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {plans.map((plan, index) => (
-          <PricingCard
-            key={index}
-            title={plan.title}
-            price={plan.price}
-            period={plan.period}
-            features={plan.features}
-            discount={plan.discount}
-          />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : error ? (
+        <div className="text-center text-red-500 py-8">{error}</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map((plan, index) => (
+            <PricingCard
+              key={plan._id || index}
+              {...mapPlanData(plan)}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 };

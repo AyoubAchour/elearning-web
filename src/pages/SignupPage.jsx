@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const SignupPage = () => {
   const navigate = useNavigate();
+  const { register, error: authError, loading: authLoading } = useAuth();
+
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -77,47 +80,30 @@ const SignupPage = () => {
     setIsLoading(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Create a user object to store (excluding confirmPassword and acceptTerms)
-      const newUser = {
-        id: Date.now().toString(),
+      // Create a user object to send to API (excluding confirmPassword and acceptTerms)
+      const userData = {
         fullName: formData.fullName,
         email: formData.email,
-        password: formData.password, // In a real app, NEVER store plain text passwords
-        createdAt: new Date().toISOString()
+        password: formData.password
       };
       
-      // Get existing users or initialize empty array
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
+      // Register user
+      await register(userData);
       
-      // Check if email already exists
-      if (existingUsers.some(user => user.email === formData.email)) {
-        setErrors({
-          form: 'An account with this email already exists.'
-        });
-        setIsLoading(false);
-        return;
-      }
-      
-      // Add new user to the array
-      existingUsers.push(newUser);
-      
-      // Save back to localStorage
-      localStorage.setItem('users', JSON.stringify(existingUsers));
-      
-      // For demo purposes, navigate to login page after successful signup
-      navigate('/login', { state: { message: 'Account created successfully! Please login.' } });
+      // Navigate to home page after successful signup
+      navigate('/', { state: { message: 'Account created successfully! Welcome to our platform.' } });
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({
-        form: 'Failed to create account. Please try again.'
+        form: error.response?.data?.message || authError || 'Failed to create account. Please try again.'
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Check for external loading state from auth context
+  const loading = isLoading || authLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -136,9 +122,9 @@ const SignupPage = () => {
             <p className="text-gray-600">Join our community and start learning today</p>
           </div>
           
-          {errors.form && (
+          {(errors.form || authError) && (
             <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
-              <p>{errors.form}</p>
+              <p>{errors.form || authError}</p>
             </div>
           )}
           
@@ -248,12 +234,12 @@ const SignupPage = () => {
             
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               className={`w-full bg-blue-600 text-white py-3 rounded-lg font-medium text-base
-                ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'} 
+                ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700'} 
                 transition-colors shadow-md mt-2`}
             >
-              {isLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center">
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
